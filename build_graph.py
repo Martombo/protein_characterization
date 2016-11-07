@@ -4,9 +4,9 @@ import math
 
 
 n_tops = 10000
-min_pval = 0.05
+min_pval = 0.001
 min_enrich = 2
-min_signif = 3
+min_signif = 5
 filter_parent = True
 min_degree = 2
 
@@ -59,13 +59,13 @@ n = 0
 tops = []
 topGO_data = {}
 fields = ['significant', 'enrichment', 'pvalue', 'name']
-for linea in open('top_w01F'):
+for linea in open('topGO_results'):
     if linea.startswith('GO.ID'):
         continue
     linea = linea.rstrip('\n')
     splat = linea.split('\t')
-    topGO_data[splat[0]] = dict(zip(fields,[int(splat[3]), int(splat[3])/float(splat[4]), float(splat[5]), splat[1].replace(' ', '_')]))
-    if n > n_tops or float(splat[5]) > min_pval or int(splat[3])/float(splat[4]) < min_enrich or int(splat[3]) < min_signif:
+    topGO_data[splat[0]] = dict(zip(fields,[float(splat[3]), float(splat[3])/float(splat[4]), float(splat[5]), splat[1]])) #.replace(' ', '_')]))
+    if n > n_tops or float(splat[5]) > min_pval or float(splat[3])/float(splat[4]) < min_enrich or float(splat[3]) < min_signif:
         continue
     tops.append(splat[0])
     n += 1
