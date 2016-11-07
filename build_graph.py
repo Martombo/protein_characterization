@@ -1,9 +1,13 @@
+import networkx as nx
+import matplotlib.pyplot as plt
+
+
 n_tops = 10000
 min_pval = 0.05
 min_enrich = 2
 min_signif = 3
 filter_parent = True
-lone_node = False
+min_degree = 2
 
 class go_explore:
 
@@ -14,8 +18,7 @@ class go_explore:
         
     def get_signif_parents(self, go):
         top_data = self.topGO[go]
-        to_print = self.indentation + top_data['name'] + ' ' + str(top_data['pvalue']) + ' ' + str(top_data['significant']) + '\n'
-        self.indentation += '--'
+        to_return = []
         if go not in self.connections:
             return
         for parent in self.connections[go]:
@@ -24,26 +27,10 @@ class go_explore:
             parent_data = self.topGO[parent]
             if filter_parent and (parent_data['pvalue'] > min_pval or parent_data['enrichment'] < min_enrich or parent_data['significant'] < min_signif):
                 continue
-            to_print += self.get_signif_parents(parent)
-        self.indentation = self.indentation[2:]
-        return to_print 
-
-    def get_signif_parents_sif(self, go):
-        top_data = self.topGO[go]
-        to_print = ''
-        if lone_node:
-            to_print = top_data['name'] + '\n'
-        if go not in self.connections:
-            return
-        for parent in self.connections[go]:
-            if parent not in self.topGO:
-                continue
-            parent_data = self.topGO[parent]
-            if filter_parent and (parent_data['pvalue'] > min_pval or parent_data['enrichment'] < min_enrich or parent_data['significant'] < min_signif):
-                continue
-            to_print += top_data['name'] + ' ' + self.connections[go][parent] + ' ' + parent_data['name'] + '\n'
-            to_print += self.get_signif_parents_sif(parent)
-        return to_print 
+            to_return.append([go, self.connections[go][parent], parent])
+            for x in self.get_signif_parents(parent):
+                to_return.append(x)
+        return to_return 
 
 
 def match_split(line, start):
@@ -82,8 +69,33 @@ for linea in open('top_w01F'):
     tops.append(splat[0])
     n += 1
 
+G = nx.Graph()
 go_exp = go_explore(topGO_data, go_connections)
 for k in tops:
-    go_parents = go_exp.get_signif_parents_sif(k)
-    if go_parents:
-        print(go_parents)
+    connections = go_exp.get_signif_parents(k)
+    if not connections:
+        continue
+    for (node1, connection, node2) in connections:
+        G.add_edge(node1, node2)
+        G[node1][node2]['color'] = connection
+
+G2 = nx.Graph()
+degree = G.degree()
+colors, sizes, labels = [], [], {}
+for edge in G.edges():
+    node1, node2 = edge
+    if degree[node1] > min_degree or degree[node2] > min_degree:
+        if node1 not in labels:
+            labels[node1] = topGO_data[node1]['name']
+            sizes.append(topGO_data[node1]['significant'])
+        if node2 not in labels:
+            labels[node2] = topGO_data[node2]['name']
+            sizes.append(topGO_data[node2]['significant'])
+        G2.add_edge(node1, node2)
+        if G[node1][node2]['color'] == 'regulates':
+            colors.append('red')
+        else:
+            colors.append('black')
+
+nx.draw(G2, edge_color=colors, labels=labels, node_size=sizes)
+plt.savefig("path.svg")
