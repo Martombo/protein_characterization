@@ -1,5 +1,6 @@
 import networkx as nx
 import matplotlib.pyplot as plt
+import math
 
 
 n_tops = 10000
@@ -77,25 +78,26 @@ for k in tops:
         continue
     for (node1, connection, node2) in connections:
         G.add_edge(node1, node2)
-        G[node1][node2]['color'] = connection
+        G[node1][node2]['connection'] = connection
 
 G2 = nx.Graph()
 degree = G.degree()
-colors, sizes, labels = [], [], {}
 for edge in G.edges():
     node1, node2 = edge
-    if degree[node1] > min_degree or degree[node2] > min_degree:
-        if node1 not in labels:
-            labels[node1] = topGO_data[node1]['name']
-            sizes.append(topGO_data[node1]['significant'])
-        if node2 not in labels:
-            labels[node2] = topGO_data[node2]['name']
-            sizes.append(topGO_data[node2]['significant'])
+    if degree[node1] >= min_degree or degree[node2] >= min_degree:
         G2.add_edge(node1, node2)
-        if G[node1][node2]['color'] == 'regulates':
-            colors.append('red')
-        else:
-            colors.append('black')
 
-nx.draw(G2, edge_color=colors, labels=labels, node_size=sizes)
+node_colors, sizes, labels = [], [], {}
+for node in G2.nodes():
+    labels[node] = topGO_data[node]['name']
+    sizes.append(topGO_data[node]['significant'])
+    node_colors.append(-math.log10(topGO_data[node]['pvalue']))
+
+edges = G2.edges()
+edge_colors = ['black'] * len(edges)
+for n in range(len(edges)):
+    if G[edges[n][0]][edges[n][1]]['connection'] == 'regulates':
+        edge_colors[n] = 'red'
+
+nx.draw(G2, edge_color=edge_colors, labels=labels, node_size=sizes, node_color=node_colors, cmap=plt.cm.Blues, iterations=1)
 plt.savefig("path.svg")
