@@ -1,6 +1,7 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import math
+import sys
 
 
 n_tops = 10000
@@ -9,6 +10,14 @@ min_enrich = 2
 min_signif = 5
 filter_parent = True
 min_degree = 2
+topGO_file = 'mol_fun/topGO_results_fisher'
+filter_file = ''
+printit = True
+size_corr = 5
+font_size = 8
+iterations = 10000
+n_plots = 1
+empty_nodes = 0
 
 class go_explore:
 
@@ -59,7 +68,7 @@ n = 0
 tops = []
 topGO_data = {}
 fields = ['significant', 'enrichment', 'pvalue', 'name']
-for linea in open('topGO_results'):
+for linea in open(topGO_file):
     if linea.startswith('GO.ID'):
         continue
     linea = linea.rstrip('\n')
@@ -69,6 +78,12 @@ for linea in open('topGO_results'):
         continue
     tops.append(splat[0])
     n += 1
+
+filter_out = []
+if filter_file:
+    for linea in open(filter_file):
+        linea = linea.rstrip('\n')
+        filter_out.append(linea.split(' ')[0])
 
 G = nx.Graph()
 go_exp = go_explore(topGO_data, go_connections)
@@ -85,7 +100,13 @@ degree = G.degree()
 for edge in G.edges():
     node1, node2 = edge
     if degree[node1] >= min_degree or degree[node2] >= min_degree:
+        if node1 in filter_out or node2 in filter_out:
+            continue
         G2.add_edge(node1, node2)
+
+for n in range(empty_nodes):
+    G2.add_node(n)
+    topGO_data[n] = {'name':'', 'significant':0, 'pvalue':0.5}
 
 node_colors, sizes, labels = [], [], {}
 for node in G2.nodes():
@@ -99,5 +120,11 @@ for n in range(len(edges)):
     if G[edges[n][0]][edges[n][1]]['connection'] == 'regulates':
         edge_colors[n] = 'red'
 
-nx.draw(G2, edge_color=edge_colors, labels=labels, node_size=sizes, node_color=node_colors, cmap=plt.cm.Blues, iterations=1)
-plt.savefig("path.svg")
+if printit:
+    for label in labels:
+        print label, labels[label] 
+
+for k in range(n_plots):
+    nx.draw(G2, edge_color=edge_colors, labels=labels, node_size=[x*size_corr for x in sizes], node_color=node_colors, cmap=plt.cm.Blues, font_size=font_size, iterations=iterations)
+    plt.savefig('path' + str(k) + '.svg')
+    plt.close()

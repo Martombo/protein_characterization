@@ -1,7 +1,17 @@
 library(topGO)
 
+meta_analysis = TRUE
+fisher = TRUE
+avg_genes = FALSE
+ontology = "MF"
 geneID2GO = readMappings("../annotation_uniprot")
 all = read.table("../dati")
+
+Fisher.test <- function(p) {
+	    Xsq <- -2*sum(log(p))
+		    p.val <- pchisq(Xsq, df = 2*length(p), lower.tail = FALSE)
+			    return(p.val)
+}
 
 psumunif = function(x,n) {
 	fun = function(k) (-1)^k * choose(n,k) * ifelse(x > k,x-k,0)^(n)
@@ -9,7 +19,7 @@ psumunif = function(x,n) {
 }
 
 run_topGO = function(gene_set, gene_sel, n_filter){
-	GO = new("topGOdata", ontology="BP", allGenes=gene_set, geneSel=gene_sel, annot=annFUN.gene2GO, gene2GO=geneID2GO)
+	GO = new("topGOdata", ontology=ontology, allGenes=gene_set, geneSel=gene_sel, annot=annFUN.gene2GO, gene2GO=geneID2GO)
 	result_W01_fish = runTest(GO, algorithm = "weight01", statistic = "fisher")
 	to_return = GenTable(GO, pval=result_W01_fish, topNodes=length(result_W01_fish@score))
 	colnames(to_return) = paste0(colnames(to_return), as.character(n_filter))
@@ -29,6 +39,10 @@ gene_sel2 = function(x){return(x>threshold2)}
 gene_set = all$V2
 names(gene_set) = all$V1
 top_go0 = run_topGO(gene_set, gene_sel0, 0)
+if(!meta_analysis){
+	write.table(top_go0, file="topGO_results0", sep="\t", quote=F, row.names=F)
+	stop()
+}
 top_go1 = run_topGO(gene_set, gene_sel1, 1)
 top_go2 = run_topGO(gene_set, gene_sel2, 2)
 
@@ -48,9 +62,18 @@ merged = merge(merged, top_go2, by="GO.ID")
 merged = merge(merged, top_go3, by="GO.ID")
 merged = merge(merged, top_go4, by="GO.ID")
 combined = data.frame(GO.ID=merged$GO.ID, Term=merged$Term0, Annotated=merged$Annotated0)
-combined$Significant = apply(merged[,paste0("Significant",c(0,0,1,2,3,4))], 1, function(x) mean(as.double(x)))
-combined$Expected = apply(merged[,paste0("Expected",c(0,0,1,2,3,4))], 1, function(x) mean(as.double(x)))
-combined$pval = apply(merged[,paste0("pval",c(0,0,1,2,3,4))], 1, function(x) psumunif(as.double(x),6))
+if(avg_genes){
+	combined$Significant = apply(merged[,paste0("Significant",c(0,0,1,2,3,4))], 1, function(x) mean(as.double(x)))
+	combined$Expected = apply(merged[,paste0("Expected",c(0,0,1,2,3,4))], 1, function(x) mean(as.double(x)))
+}else{
+	combined$Significant = merged$Significant0
+	combined$Expected = merged$Expected0
+}
+if(fisher){
+	combined$pval = apply(merged[,paste0("pval",c(0,0,1,2,3,4))], 1, function(x) Fisher.test(as.double(x)))
+}else{
+	combined$pval = apply(merged[,paste0("pval",c(0,0,1,2,3,4))], 1, function(x) psumunif(as.double(x), 6))
+}
 combined$pval[is.na(combined$pval)] = 1e-100
 combined = combined[order(combined$pval, decreasing=F),]
 
